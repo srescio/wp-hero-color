@@ -77,6 +77,18 @@ final class AdminSettings
             exit;
         }
 
+        $catRaw = isset($_POST['categories']) && is_array($_POST['categories']) ? $_POST['categories'] : [];
+        $tagRaw = isset($_POST['tags']) && is_array($_POST['tags']) ? $_POST['tags'] : [];
+        $categoryIn = self::sanitize_term_ids($catRaw, 'category');
+        $tagIn = self::sanitize_term_ids($tagRaw, 'post_tag');
+        $taxFilters = [];
+        if ($categoryIn !== []) {
+            $taxFilters['category_in'] = $categoryIn;
+        }
+        if ($tagIn !== []) {
+            $taxFilters['tag_in'] = $tagIn;
+        }
+
         update_option(
             self::OPTION_KEY,
             [
@@ -84,6 +96,8 @@ final class AdminSettings
                 'post_types' => $postTypes,
                 'mode' => $mode,
                 'linear_dir' => $linearDir,
+                'categories' => $categoryIn,
+                'tags' => $tagIn,
             ],
             false
         );
@@ -91,7 +105,7 @@ final class AdminSettings
         @set_time_limit(0);
 
         $runner = new BulkRunner(Plugin::service());
-        $results = $runner->run($postTypes, $mode, $linearDir);
+        $results = $runner->run($postTypes, $mode, $linearDir, $taxFilters);
 
         $counts = ['processed' => 0, 'skipped' => 0, 'failed' => 0];
         foreach ($results as $row) {
@@ -147,6 +161,8 @@ final class AdminSettings
         $savedScope = isset($prefs['scope']) ? (string) $prefs['scope'] : 'selected';
         $savedMode = isset($prefs['mode']) && is_string($prefs['mode']) ? $prefs['mode'] : '';
         $savedDir = isset($prefs['linear_dir']) && is_string($prefs['linear_dir']) ? $prefs['linear_dir'] : '';
+        $savedCats = isset($prefs['categories']) && is_array($prefs['categories']) ? array_map('intval', $prefs['categories']) : [];
+        $savedTags = isset($prefs['tags']) && is_array($prefs['tags']) ? array_map('intval', $prefs['tags']) : [];
 
         echo '<div class="wrap">';
         echo '<h1>' . esc_html__('WP Hero Color', 'wp-hero-color') . '</h1>';
@@ -199,6 +215,55 @@ final class AdminSettings
         }
         echo '</div></td></tr>';
 
+        echo '<tr><th scope="row">' . esc_html__('Categories', 'wp-hero-color') . '</th><td>';
+        echo '<p class="description">' . esc_html__('Optional. Posts must be in at least one selected category. Combined with tags using AND. Applies via tax_query (mainly affects built-in post type “post”).', 'wp-hero-color') . '</p>';
+        echo '<div style="max-height:220px;overflow:auto;border:1px solid #c3c4c7;padding:8px;border-radius:4px;max-width:640px;">';
+        $cats = get_terms([
+            'taxonomy' => 'category',
+            'hide_empty' => false,
+            'orderby' => 'name',
+            'order' => 'ASC',
+        ]);
+        if (is_wp_error($cats) || !is_array($cats)) {
+            echo '<p>' . esc_html__('No categories found.', 'wp-hero-color') . '</p>';
+        } else {
+            foreach ($cats as $term) {
+                if (!isset($term->term_id)) {
+                    continue;
+                }
+                $tid = (int) $term->term_id;
+                $checked = in_array($tid, $savedCats, true) ? ' checked' : '';
+                echo '<label style="display:block;margin:2px 0;"><input type="checkbox" name="categories[]" value="' . esc_attr((string) $tid) . '"' . $checked . ' /> ';
+                echo esc_html((string) $term->name) . ' <span class="description">(' . esc_html((string) $tid) . ')</span></label>';
+            }
+        }
+        echo '</div></td></tr>';
+
+        echo '<tr><th scope="row">' . esc_html__('Tags', 'wp-hero-color') . '</th><td>';
+        echo '<p class="description">' . esc_html__('Optional. Posts must have at least one selected tag. When both categories and tags are set, posts must match both.', 'wp-hero-color') . '</p>';
+        echo '<div style="max-height:220px;overflow:auto;border:1px solid #c3c4c7;padding:8px;border-radius:4px;max-width:640px;">';
+        $tags = get_terms([
+            'taxonomy' => 'post_tag',
+            'hide_empty' => false,
+            'orderby' => 'name',
+            'order' => 'ASC',
+            'number' => 500,
+        ]);
+        if (is_wp_error($tags) || !is_array($tags)) {
+            echo '<p>' . esc_html__('No tags found.', 'wp-hero-color') . '</p>';
+        } else {
+            foreach ($tags as $term) {
+                if (!isset($term->term_id)) {
+                    continue;
+                }
+                $tid = (int) $term->term_id;
+                $checked = in_array($tid, $savedTags, true) ? ' checked' : '';
+                echo '<label style="display:block;margin:2px 0;"><input type="checkbox" name="tags[]" value="' . esc_attr((string) $tid) . '"' . $checked . ' /> ';
+                echo esc_html((string) $term->name) . ' <span class="description">(' . esc_html((string) $tid) . ')</span></label>';
+            }
+        }
+        echo '</div></td></tr>';
+
         echo '<tr><th scope="row"><label for="wp-hero-color-mode">' . esc_html__('Mode override', 'wp-hero-color') . '</label></th><td>';
         echo '<select name="mode" id="wp-hero-color-mode">';
         echo '<option value="">' . esc_html__('(keep each post as saved)', 'wp-hero-color') . '</option>';
@@ -231,10 +296,31 @@ final class AdminSettings
         echo '<h2>' . esc_html__('WP-CLI over SSH', 'wp-hero-color') . '</h2>';
         echo '<p>' . esc_html__('Browsers cannot open SSH sessions. Copy these to run on the server (same as this plugin’s bulk form).', 'wp-hero-color') . '</p>';
         $site = preg_replace('#^https?://#', '', home_url());
-        echo '<pre style="overflow:auto;background:#f6f7f7;padding:12px;">ssh user@host \'cd /path/to/wordpress && wp hero-color recompute_all --post_type=post,page --mode=conic --linear_dir=vertical\'</pre>';
+        echo '<pre style="overflow:auto;background:#f6f7f7;padding:12px;">ssh user@host \'cd /path/to/wordpress && wp hero-color recompute_all --post_type=post --mode=conic --linear_dir=vertical --category_in=3,12 --tag_in=40\'</pre>';
         echo '<pre style="overflow:auto;background:#f6f7f7;padding:12px;">wp hero-color recompute_all --all-supported --mode=solid</pre>';
         echo '<p class="description">' . esc_html__('Replace user@host and /path/to/wordpress. Site:', 'wp-hero-color') . ' <code>' . esc_html($site) . '</code></p>';
 
         echo '</div>';
+    }
+
+    /**
+     * @param array<int,mixed> $raw
+     * @return array<int,int>
+     */
+    private static function sanitize_term_ids(array $raw, string $taxonomy): array
+    {
+        $out = [];
+        foreach ($raw as $item) {
+            $id = (int) $item;
+            if ($id < 1) {
+                continue;
+            }
+            $term = get_term($id, $taxonomy);
+            if ($term instanceof \WP_Term) {
+                $out[] = $id;
+            }
+        }
+
+        return array_values(array_unique($out));
     }
 }

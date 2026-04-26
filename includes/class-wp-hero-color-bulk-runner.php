@@ -12,16 +12,17 @@ final class BulkRunner
 
     /**
      * @param array<int,string> $postTypes
+     * @param array{category_in?: array<int>, tag_in?: array<int>} $taxFilters Term IDs; category and tag groups are AND-combined. Within each group, terms use IN (match any).
      * @return array<int,array<string,mixed>>
      */
-    public function run(array $postTypes, ?string $mode, ?string $linearDir): array
+    public function run(array $postTypes, ?string $mode, ?string $linearDir, array $taxFilters = []): array
     {
         $postTypes = array_values(array_unique(array_filter($postTypes, static fn (string $t): bool => $t !== '')));
         if ($postTypes === []) {
             return [];
         }
 
-        $ids = get_posts([
+        $args = [
             'post_type' => $postTypes,
             'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
             'posts_per_page' => -1,
@@ -29,7 +30,14 @@ final class BulkRunner
             'orderby' => 'ID',
             'order' => 'ASC',
             'suppress_filters' => true,
-        ]);
+        ];
+
+        $taxQuery = self::buildTaxQuery($taxFilters);
+        if ($taxQuery !== null) {
+            $args['tax_query'] = $taxQuery;
+        }
+
+        $ids = get_posts($args);
 
         $results = [];
         foreach ($ids as $postId) {
@@ -79,6 +87,74 @@ final class BulkRunner
         }
 
         return array_values(array_unique($out));
+    }
+
+    /**
+     * @param array<string,mixed> $assocArgs
+     * @return array{category_in?: array<int>, tag_in?: array<int>}
+     */
+    public static function resolveTaxFiltersFromCliArgs(array $assocArgs): array
+    {
+        $out = [];
+        if (!empty($assocArgs['category_in'])) {
+            $ids = array_values(array_filter(array_map('intval', explode(',', (string) $assocArgs['category_in']))));
+            if ($ids !== []) {
+                $out['category_in'] = $ids;
+            }
+        }
+        if (!empty($assocArgs['tag_in'])) {
+            $ids = array_values(array_filter(array_map('intval', explode(',', (string) $assocArgs['tag_in']))));
+            if ($ids !== []) {
+                $out['tag_in'] = $ids;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array{category_in?: array<int>, tag_in?: array<int>} $taxFilters
+     * @return array<string,mixed>|null
+     */
+    public static function buildTaxQuery(array $taxFilters): ?array
+    {
+        $catIn = isset($taxFilters['category_in']) && is_array($taxFilters['category_in'])
+            ? array_values(array_unique(array_filter(array_map('intval', $taxFilters['category_in']), static fn (int $id): bool => $id > 0)))
+            : [];
+        $tagIn = isset($taxFilters['tag_in']) && is_array($taxFilters['tag_in'])
+            ? array_values(array_unique(array_filter(array_map('intval', $taxFilters['tag_in']), static fn (int $id): bool => $id > 0)))
+            : [];
+
+        if ($catIn === [] && $tagIn === []) {
+            return null;
+        }
+
+        $clauses = [];
+        if ($catIn !== []) {
+            $clauses[] = [
+                'taxonomy' => 'category',
+                'field' => 'term_id',
+                'terms' => $catIn,
+                'operator' => 'IN',
+                'include_children' => true,
+            ];
+        }
+        if ($tagIn !== []) {
+            $clauses[] = [
+                'taxonomy' => 'post_tag',
+                'field' => 'term_id',
+                'terms' => $tagIn,
+                'operator' => 'IN',
+            ];
+        }
+
+        if ($clauses === []) {
+            return null;
+        }
+
+        $clauses['relation'] = 'AND';
+
+        return $clauses;
     }
 
     /**

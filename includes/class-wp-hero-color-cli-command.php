@@ -84,6 +84,12 @@ final class CliCommand
      * [--linear_dir=<dir>]
      * : vertical|horizontal|diag_tl_br|diag_tr_bl
      *
+     * [--category_in=<ids>]
+     * : Comma-separated category term IDs (match any selected category; AND with tag_in when both set).
+     *
+     * [--tag_in=<ids>]
+     * : Comma-separated post_tag term IDs (match any selected tag).
+     *
      * [--format=<format>]
      * : table|json
      * ---
@@ -102,7 +108,8 @@ final class CliCommand
             return;
         }
 
-        $results = $this->bulk->run($postTypes, $mode, $dir);
+        $taxFilters = BulkRunner::resolveTaxFiltersFromCliArgs($assoc_args);
+        $results = $this->bulk->run($postTypes, $mode, $dir, $taxFilters);
 
         $this->render_results($results, (string) ($assoc_args['format'] ?? 'table'));
 

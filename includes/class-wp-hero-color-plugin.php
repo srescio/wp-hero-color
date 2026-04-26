@@ -18,6 +18,9 @@ final class Plugin
         add_action('init', [self::class, 'register_meta']);
         add_action('rest_api_init', [self::class, 'register_rest_routes']);
         add_action('wp_enqueue_scripts', [self::class, 'enqueue_frontend_assets']);
+        add_action('wp_head', [self::class, 'render_inline_post_styles'], 99);
+        add_action('add_meta_boxes', [self::class, 'register_classic_meta_box']);
+        add_action('save_post', [self::class, 'save_classic_meta_box'], 10, 2);
         add_action('enqueue_block_editor_assets', [self::class, 'enqueue_editor_assets']);
         add_action('set_post_thumbnail', [self::class, 'on_set_post_thumbnail'], 10, 3);
         add_filter('pll_copy_post_metas', [self::class, 'register_polylang_meta_copy'], 10, 5);
@@ -51,6 +54,132 @@ final class Plugin
     {
         $controller = new RestController(self::service());
         $controller->register_routes();
+    }
+
+    public static function register_classic_meta_box(): void
+    {
+        foreach (['post', 'page'] as $postType) {
+            if (!post_type_supports($postType, 'thumbnail')) {
+                continue;
+            }
+            add_meta_box(
+                'wp-hero-color-classic-preview',
+                __('Hero Color', 'wp-hero-color'),
+                [self::class, 'render_classic_meta_box'],
+                $postType,
+                'side',
+                'default'
+            );
+        }
+    }
+
+    /**
+     * @param \WP_Post $post
+     */
+    public static function render_classic_meta_box($post): void
+    {
+        if (!is_object($post) || !isset($post->ID)) {
+            echo '<p>' . esc_html__('No post context available.', 'wp-hero-color') . '</p>';
+            return;
+        }
+
+        wp_nonce_field('wp_hero_color_classic_box', 'wp_hero_color_classic_box_nonce');
+
+        $payload = self::service()->get_payload((int) $post->ID);
+        if (!is_array($payload)) {
+            $payload = self::service()->sanitize_payload([]);
+            echo '<p>' . esc_html__('No computed hero data yet. Set a featured image and run recompute.', 'wp-hero-color') . '</p>';
+        }
+
+        $payload = self::service()->sanitize_payload($payload);
+        $previewBg = self::service()->build_background_css($payload);
+        $main = (string) $payload['main'];
+        $mode = (string) $payload['mode'];
+        $dir = (string) $payload['linear_dir'];
+
+        echo '<div style="display:flex;flex-direction:column;gap:8px;">';
+        echo '<label for="wp-hero-color-mode"><strong>' . esc_html__('Mode', 'wp-hero-color') . '</strong></label>';
+        echo '<select id="wp-hero-color-mode" name="wp_hero_color_mode" style="width:100%;">';
+        foreach (Service::MODES as $modeOpt) {
+            printf(
+                '<option value="%s"%s>%s</option>',
+                esc_attr($modeOpt),
+                selected($mode, $modeOpt, false),
+                esc_html($modeOpt)
+            );
+        }
+        echo '</select>';
+        echo '<label for="wp-hero-color-linear-dir"><strong>' . esc_html__('Direction', 'wp-hero-color') . '</strong></label>';
+        echo '<select id="wp-hero-color-linear-dir" name="wp_hero_color_linear_dir" style="width:100%;">';
+        foreach (Service::LINEAR_DIRECTIONS as $dirOpt) {
+            printf(
+                '<option value="%s"%s>%s</option>',
+                esc_attr($dirOpt),
+                selected($dir, $dirOpt, false),
+                esc_html($dirOpt)
+            );
+        }
+        echo '</select>';
+        echo '<button type="submit" class="button button-secondary" name="wp_hero_color_recompute" value="1">'
+            . esc_html__('Recompute', 'wp-hero-color') . '</button>';
+        echo '<div style="width:100%;aspect-ratio:16/10;border:1px solid #dcdcde;border-radius:4px;background:' . esc_attr($previewBg) . ';"></div>';
+        echo '<div style="display:flex;align-items:center;gap:8px;">';
+        echo '<span style="display:inline-block;width:16px;height:16px;border:1px solid #c3c4c7;border-radius:3px;background:' . esc_attr($main) . ';"></span>';
+        echo '<code style="font-size:12px;">' . esc_html($main) . '</code>';
+        echo '</div>';
+        if (isset($payload['edges']) && is_array($payload['edges'])) {
+            echo '<div style="display:grid;grid-template-columns:repeat(8,1fr);gap:4px;">';
+            foreach ($payload['edges'] as $edge) {
+                $color = is_string($edge) ? $edge : $main;
+                echo '<span title="' . esc_attr($color) . '" style="display:inline-block;width:100%;height:14px;border:1px solid #c3c4c7;border-radius:2px;background:' . esc_attr($color) . ';"></span>';
+            }
+            echo '</div>';
+        }
+        echo '</div>';
+    }
+
+    /**
+     * @param \WP_Post $post
+     */
+    public static function save_classic_meta_box(int $post_id, $post): void
+    {
+        if (!is_object($post) || !isset($post->post_type)) {
+            return;
+        }
+        if (!in_array((string) $post->post_type, ['post', 'page'], true)) {
+            return;
+        }
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+            return;
+        }
+        if (!isset($_POST['wp_hero_color_classic_box_nonce']) || !wp_verify_nonce((string) $_POST['wp_hero_color_classic_box_nonce'], 'wp_hero_color_classic_box')) {
+            return;
+        }
+        if (!current_user_can('edit_post', $post_id)) {
+            return;
+        }
+
+        $mode = isset($_POST['wp_hero_color_mode']) ? sanitize_text_field((string) $_POST['wp_hero_color_mode']) : null;
+        $dir = isset($_POST['wp_hero_color_linear_dir']) ? sanitize_text_field((string) $_POST['wp_hero_color_linear_dir']) : null;
+        $recompute = isset($_POST['wp_hero_color_recompute']) && '1' === (string) $_POST['wp_hero_color_recompute'];
+
+        if ($recompute) {
+            self::service()->recompute_for_post($post_id, null, $mode, $dir);
+            return;
+        }
+
+        $payload = self::service()->get_payload($post_id);
+        if (!is_array($payload)) {
+            $payload = self::service()->sanitize_payload([]);
+        }
+        if (is_string($mode) && in_array($mode, Service::MODES, true)) {
+            $payload['mode'] = $mode;
+        }
+        if (is_string($dir) && in_array($dir, Service::LINEAR_DIRECTIONS, true)) {
+            $payload['linear_dir'] = $dir;
+        }
+
+        self::service()->save_payload($post_id, $payload);
     }
 
     public static function enqueue_frontend_assets(): void
@@ -107,12 +236,67 @@ final class Plugin
 
     public static function register_cli(): void
     {
-        if (!defined('WP_CLI') || !WP_CLI) {
+        if (!defined('WP_CLI') || !constant('WP_CLI') || !class_exists('\\WP_CLI')) {
             return;
         }
 
         $command = new CliCommand(self::service());
         \WP_CLI::add_command('hero-color', $command);
+    }
+
+    public static function render_inline_post_styles(): void
+    {
+        $postIds = self::resolve_query_post_ids();
+        if ($postIds === []) {
+            return;
+        }
+
+        $css = '';
+        foreach ($postIds as $postId) {
+            $payload = self::service()->get_payload($postId);
+            if (!is_array($payload)) {
+                continue;
+            }
+
+            $payload = self::service()->sanitize_payload($payload);
+            $main = (string) $payload['main'];
+            $selector = '#post-' . (int) $postId . ' .post-thumbnail';
+            $declarations = '--sr-hero-main:' . $main . ';--sr-hero-bg:' . $main . ';background-color:' . $main . ';';
+
+            if ((string) $payload['mode'] !== 'solid') {
+                $bg = self::service()->build_background_css($payload);
+                $declarations .= 'background-image:' . $bg . ';background-repeat:no-repeat;background-size:cover;background-position:center center;';
+            }
+
+            $css .= $selector . '{' . $declarations . '}';
+            $css .= $selector . ' figure{background-color:' . $main . ';}';
+        }
+
+        if ($css === '') {
+            return;
+        }
+
+        echo '<style id="wp-hero-color-inline">' . $css . '</style>';
+    }
+
+    /**
+     * @return array<int,int>
+     */
+    private static function resolve_query_post_ids(): array
+    {
+        $postIds = [];
+        if (is_singular()) {
+            $postIds[] = (int) get_the_ID();
+        }
+        if (isset($GLOBALS['wp_query']) && isset($GLOBALS['wp_query']->posts) && is_array($GLOBALS['wp_query']->posts)) {
+            foreach ($GLOBALS['wp_query']->posts as $post) {
+                if (is_object($post) && isset($post->ID)) {
+                    $postIds[] = (int) $post->ID;
+                }
+            }
+        }
+
+        return array_values(array_unique(array_filter($postIds, static fn ($id): bool => $id > 0)));
     }
 
     /**

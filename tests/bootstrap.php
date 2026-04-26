@@ -8,3 +8,4 @@ if (file_exists($autoload)) {
 }
 
 require_once __DIR__ . '/../includes/class-wp-hero-color-service.php';
+require_once __DIR__ . '/../includes/class-wp-hero-color-plugin.php';

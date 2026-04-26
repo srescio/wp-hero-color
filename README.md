@@ -20,12 +20,31 @@ Editor panel preview samples:
 
 ## Data model
 
-The plugin stores the computed payload in post meta key `_sr_hero_bg`:
+The plugin stores one **JSON string** in post meta key `_sr_hero_bg` (registered for the REST API and Polylang meta copy). The document is normalized on save; unknown fields are dropped.
 
-- `main`: dominant color
-- `edges`: 8 edge colors (corners + midpoints)
-- `mode`: `solid|linear|conic`
-- `linear_dir`: `vertical|horizontal|diag_tl_br|diag_tr_bl`
+| Field | Type | Meaning |
+|-------|------|---------|
+| `v` | int | Payload schema version (currently `1`). |
+| `main` | string | Dominant color as `rgb(r,g,b)` from the central region of a downscaled copy of the featured image. |
+| `edges` | string[] | Eight colors in fixed order: `tl`, `t`, `tr`, `r`, `br`, `b`, `bl`, `l` — each `rgb(r,g,b)` sampled from bands near the image edges. |
+| `mode` | string | `solid` \| `linear` \| `conic` — how the frontend builds background CSS from `main` and `edges`. |
+| `linear_dir` | string | For `linear` and `conic`: `vertical` \| `horizontal` \| `diag_tl_br` \| `diag_tr_bl` (ignored for `solid` in practice). |
+| `attachment_id` | int | Featured image attachment ID used for the last successful compute (0 if unknown). |
+| `updated_at` | string | ISO-8601 timestamp (UTC) of the last compute. |
+
+**Consumers:** the block editor panel, classic meta box, REST `compute` / `post/{id}`, WP-CLI, bulk admin form, and `set_post_thumbnail` all read or write this meta. The public helper `wp_hero_color_get_attributes( $post_id )` maps the payload to HTML attributes and an inline `style` for themes.
+
+## How it works
+
+1. **Input** — The compute path resolves the featured image (or an explicit `attachment_id` over REST), then reads the file from disk with PHP (`get_attached_file` + `file_get_contents`).
+
+2. **Decode and resize** — The bytes are decoded with **PHP GD** (`imagecreatefromstring`). Wide images are downscaled (long edge about 320px) with `imagecopyresampled` so work stays bounded.
+
+3. **Sampling** — A band inset from the edges defines a “center” rectangle; the most frequent RGB bucket there becomes `main`. Eight outer regions map to `edges` (same bucketing logic, skipping near-black and near-white noise).
+
+4. **Output** — Results are JSON-encoded into `_sr_hero_bg`. CSS for the hero wrapper is derived in PHP: solid uses `main`; `linear` maps opposing edge groups to gradient stops and direction; `conic` builds a `conic-gradient` from the eight edge colors.
+
+5. **Where it runs** — All of the above is **server-side only** (no ImageMagick, Node, or external binaries). **Settings → Hero Color** includes an environment table; if GD or other hard requirements are missing, bulk/REST/CLI are blocked and the Plugins screen shows a row-level notice for administrators.
 
 ## Admin settings
 

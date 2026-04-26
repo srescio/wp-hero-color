@@ -12,6 +12,7 @@ final class Plugin
     {
         require_once WP_HERO_COLOR_DIR . 'includes/class-wp-hero-color-service.php';
         require_once WP_HERO_COLOR_DIR . 'includes/class-wp-hero-color-rest-controller.php';
+        require_once WP_HERO_COLOR_DIR . 'includes/class-wp-hero-color-cli-command.php';
 
         add_action('plugins_loaded', [self::class, 'load_textdomain']);
         add_action('init', [self::class, 'register_meta']);
@@ -20,6 +21,7 @@ final class Plugin
         add_action('enqueue_block_editor_assets', [self::class, 'enqueue_editor_assets']);
         add_action('set_post_thumbnail', [self::class, 'on_set_post_thumbnail'], 10, 3);
         add_filter('pll_copy_post_metas', [self::class, 'register_polylang_meta_copy'], 10, 5);
+        add_action('init', [self::class, 'register_cli']);
     }
 
     public static function service(): Service
@@ -101,6 +103,16 @@ final class Plugin
         }
 
         self::service()->recompute_for_post($post_id, $thumbnail_id, null, null);
+    }
+
+    public static function register_cli(): void
+    {
+        if (!defined('WP_CLI') || !WP_CLI) {
+            return;
+        }
+
+        $command = new CliCommand(self::service());
+        \WP_CLI::add_command('hero-color', $command);
     }
 
     /**

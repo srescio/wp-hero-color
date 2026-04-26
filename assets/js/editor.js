@@ -2,6 +2,10 @@
   if (!wp || !wp.data || !wp.components || !wp.editPost || !wp.plugins || !wp.element) {
     return;
   }
+  if (window.__wpHeroColorEditorMounted) {
+    return;
+  }
+  window.__wpHeroColorEditorMounted = true;
 
   var el = wp.element.createElement;
   var Fragment = wp.element.Fragment;
@@ -189,7 +193,7 @@
 
     return el(
       PluginDocumentSettingPanel,
-      { name: "wp-hero-color-panel", title: "Hero background", className: "wp-hero-color-panel" },
+      { name: "wp-hero-color-panel", title: "Hero Color", className: "wp-hero-color-panel" },
       error
         ? el(Notice, { status: "error", isDismissible: false }, error)
         : null,
@@ -233,6 +237,12 @@
         ? el("p", { style: { marginTop: "8px", marginBottom: 0, fontFamily: "monospace", fontSize: "12px" } }, payload.main)
         : null
     );
+  }
+
+  if (typeof wp.plugins.unregisterPlugin === "function") {
+    try {
+      wp.plugins.unregisterPlugin("wp-hero-color-plugin");
+    } catch (e) {}
   }
 
   registerPlugin("wp-hero-color-plugin", {

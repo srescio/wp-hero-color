@@ -59,6 +59,9 @@ final class Plugin
     public static function register_classic_meta_box(): void
     {
         foreach (['post', 'page'] as $postType) {
+            if (function_exists('use_block_editor_for_post_type') && use_block_editor_for_post_type($postType)) {
+                continue;
+            }
             if (!post_type_supports($postType, 'thumbnail')) {
                 continue;
             }
@@ -260,16 +263,26 @@ final class Plugin
 
             $payload = self::service()->sanitize_payload($payload);
             $main = (string) $payload['main'];
+            $mode = (string) $payload['mode'];
             $selector = '#post-' . (int) $postId . ' .post-thumbnail';
-            $declarations = '--sr-hero-main:' . $main . ';--sr-hero-bg:' . $main . ';background-color:' . $main . ';';
+            $declarations = '--sr-hero-main:' . $main . ';--sr-hero-bg:' . $main . ';background-color:' . $main . ';background-attachment:scroll !important;position:relative;';
 
-            if ((string) $payload['mode'] !== 'solid') {
+            if ($mode !== 'solid') {
                 $bg = self::service()->build_background_css($payload);
-                $declarations .= 'background-image:' . $bg . ';background-repeat:no-repeat;background-size:cover;background-position:center center;';
+                $declarations .= '--sr-hero-bg-image:' . $bg . ';';
             }
 
             $css .= $selector . '{' . $declarations . '}';
-            $css .= $selector . ' figure{background-color:' . $main . ';}';
+            $css .= $selector . ' figure{background-color:' . $main . ';position:relative;z-index:1;}';
+            if ($mode !== 'solid') {
+                $beforeBlend = ('conic' === $mode) ? 'normal' : 'soft-light';
+                $beforeOpacity = ('conic' === $mode) ? '0.92' : '1';
+                $css .= $selector . '::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;opacity:1;'
+                    . 'background-image:var(--sr-hero-bg-image);background-repeat:no-repeat;background-size:cover;'
+                    . 'background-position:center center;mix-blend-mode:' . $beforeBlend . ';opacity:' . $beforeOpacity . ';}';
+            } else {
+                $css .= $selector . '::before{content:none;}';
+            }
         }
 
         if ($css === '') {

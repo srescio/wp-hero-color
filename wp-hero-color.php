@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Hero Color
  * Description: Deterministic hero background colors and gradients from featured images.
- * Version: 0.1.3
+ * Version: 0.1.4
  * Requires at least: 6.5
  * Requires PHP: 8.0
  * Author: Simone Rescio
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('WP_HERO_COLOR_VERSION', '0.1.3');
+define('WP_HERO_COLOR_VERSION', '0.1.4');
 define('WP_HERO_COLOR_FILE', __FILE__);
 define('WP_HERO_COLOR_DIR', plugin_dir_path(__FILE__));
 define('WP_HERO_COLOR_URL', plugin_dir_url(__FILE__));

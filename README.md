@@ -27,6 +27,13 @@ The plugin stores the computed payload in post meta key `_sr_hero_bg`:
 - `mode`: `solid|linear|conic`
 - `linear_dir`: `vertical|horizontal|diag_tl_br|diag_tr_bl`
 
+## Admin settings
+
+In **wp-admin**, open **Settings → Hero Color** (capability: `manage_options`). From there you can:
+
+- Run **bulk recompute** on the server (same logic as `wp hero-color recompute_all`), with scope and optional mode overrides.
+- Copy **REST** and **WP-CLI over SSH** examples for automation (MCP and remote hosts use these; the browser cannot open SSH itself).
+
 ## Host Theme Integration Contract
 
 To apply the result in frontend markup, host themes should add plugin-provided attributes on the hero wrapper element (typically `.post-thumbnail`):

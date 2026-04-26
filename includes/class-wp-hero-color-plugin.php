@@ -11,8 +11,10 @@ final class Plugin
     public static function bootstrap(): void
     {
         require_once WP_HERO_COLOR_DIR . 'includes/class-wp-hero-color-service.php';
+        require_once WP_HERO_COLOR_DIR . 'includes/class-wp-hero-color-bulk-runner.php';
         require_once WP_HERO_COLOR_DIR . 'includes/class-wp-hero-color-rest-controller.php';
         require_once WP_HERO_COLOR_DIR . 'includes/class-wp-hero-color-cli-command.php';
+        require_once WP_HERO_COLOR_DIR . 'includes/class-wp-hero-color-admin-settings.php';
 
         add_action('plugins_loaded', [self::class, 'load_textdomain']);
         add_action('init', [self::class, 'register_meta']);
@@ -25,6 +27,7 @@ final class Plugin
         add_action('set_post_thumbnail', [self::class, 'on_set_post_thumbnail'], 10, 3);
         add_filter('pll_copy_post_metas', [self::class, 'register_polylang_meta_copy'], 10, 5);
         add_action('init', [self::class, 'register_cli']);
+        AdminSettings::init();
     }
 
     public static function service(): Service

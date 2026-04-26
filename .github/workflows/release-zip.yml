@@ -1,0 +1,75 @@
+# Builds a WordPress-friendly ZIP: root folder is always `wp-hero-color/`
+# (stable path for uploads to wp-admin or SFTP).
+#
+# Triggers:
+# - Publishing a GitHub Release (attaches the ZIP to that release).
+# - Manual run (workflow_dispatch) — downloads ZIP from the Actions run summary.
+
+name: Build release ZIP
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Release workflow must build from the tag, not the default branch.
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
+
+      - name: Resolve version label
+        id: meta
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "label=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "label=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Assemble distributable tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="dist/wp-hero-color"
+          rm -rf dist
+          mkdir -p "$root"
+          cp wp-hero-color.php "$root/"
+          cp -r includes assets "$root/"
+          if [[ -f README.md ]]; then
+            cp README.md "$root/"
+          fi
+
+      - name: Create ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          ver="${{ steps.meta.outputs.label }}"
+          out="wp-hero-color-${ver}.zip"
+          (cd dist && zip -qr "../${out}" wp-hero-color)
+          ls -lh "$out"
+          echo "zip_path=${out}" >> "$GITHUB_OUTPUT"
+        id: pack
+
+      - name: Upload to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.pack.outputs.zip_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload workflow artifact (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp-hero-color-${{ steps.meta.outputs.label }}
+          path: ${{ steps.pack.outputs.zip_path }}

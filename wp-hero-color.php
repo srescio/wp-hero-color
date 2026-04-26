@@ -22,5 +22,6 @@ define('WP_HERO_COLOR_DIR', plugin_dir_path(__FILE__));
 define('WP_HERO_COLOR_URL', plugin_dir_url(__FILE__));
 
 require_once WP_HERO_COLOR_DIR . 'includes/class-wp-hero-color-plugin.php';
+require_once WP_HERO_COLOR_DIR . 'includes/functions-public-api.php';
 
 \WPHeroColor\Plugin::bootstrap();

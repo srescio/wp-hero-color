@@ -49,6 +49,19 @@ final class Plugin
         $controller->register_routes();
     }
 
+    /**
+     * @return array<string,string>
+     */
+    public static function get_attributes_for_post(int $post_id): array
+    {
+        $payload = self::service()->get_payload($post_id);
+        if ($payload === null) {
+            return [];
+        }
+
+        return self::service()->build_attributes($payload);
+    }
+
     public static function on_set_post_thumbnail(int $meta_id, int $post_id, int $thumbnail_id): void
     {
         if ($post_id < 1 || $thumbnail_id < 1) {

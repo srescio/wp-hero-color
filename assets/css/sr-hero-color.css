@@ -1,0 +1,41 @@
+[data-sr-hero-computed="1"] {
+  --sr-hero-bg-image: none;
+  --sr-hero-gradient-blend-mode: soft-light;
+  --sr-hero-gradient-opacity: 1;
+  background-color: var(--sr-hero-main, rgb(34, 34, 34));
+  background-repeat: repeat;
+  background-size: auto;
+  background-position: top left;
+  background-attachment: scroll !important;
+  position: relative;
+}
+
+[data-sr-hero-computed="1"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: var(--sr-hero-gradient-opacity);
+  background-image: var(--sr-hero-bg-image);
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center center;
+  mix-blend-mode: var(--sr-hero-gradient-blend-mode);
+}
+
+[data-sr-hero-computed="1"] figure {
+  background-color: var(--sr-hero-bg, var(--sr-hero-main, rgb(34, 34, 34)));
+  transition: background-color 160ms ease;
+  position: relative;
+  z-index: 1;
+}
+
+[data-sr-hero-computed="1"] img {
+  display: block;
+}
+
+[data-sr-hero-computed="1"][data-sr-hero-mode="solid"]::before {
+  background-image: none;
+  opacity: 0;
+}

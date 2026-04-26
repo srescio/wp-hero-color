@@ -1,11 +1,13 @@
 <?php
 /**
  * Plugin Name: WP Hero Color
+ * Plugin URI: https://github.com/srescio/wp-hero-color
  * Description: Deterministic hero background colors and gradients from featured images.
  * Version: 0.1.0
  * Requires at least: 6.5
  * Requires PHP: 8.0
  * Author: Simone Rescio
+ * Author URI: https://simonerescio.it
  * License: GPL-2.0-or-later
  * Text Domain: wp-hero-color
  */
@@ -22,5 +24,6 @@ define('WP_HERO_COLOR_DIR', plugin_dir_path(__FILE__));
 define('WP_HERO_COLOR_URL', plugin_dir_url(__FILE__));
 
 require_once WP_HERO_COLOR_DIR . 'includes/class-wp-hero-color-plugin.php';
+require_once WP_HERO_COLOR_DIR . 'includes/functions-public-api.php';
 
 \WPHeroColor\Plugin::bootstrap();

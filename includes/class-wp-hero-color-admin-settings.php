@@ -13,6 +13,12 @@ final class AdminSettings
         add_action('admin_menu', [self::class, 'register_menu']);
         add_action('admin_post_wp_hero_color_bulk', [self::class, 'handle_bulk']);
         add_filter('plugin_action_links_' . plugin_basename(WP_HERO_COLOR_FILE), [self::class, 'plugin_action_links']);
+        add_action(
+            'after_plugin_row_' . plugin_basename(WP_HERO_COLOR_FILE),
+            [self::class, 'render_plugin_row_requirements'],
+            10,
+            3
+        );
     }
 
     /**
@@ -45,6 +51,19 @@ final class AdminSettings
         }
 
         check_admin_referer('wp_hero_color_bulk');
+
+        if (!Requirements::is_ready()) {
+            wp_safe_redirect(
+                add_query_arg(
+                    [
+                        'page' => 'wp-hero-color',
+                        'bulk_error' => 'requirements',
+                    ],
+                    admin_url('options-general.php')
+                )
+            );
+            exit;
+        }
 
         $mode = isset($_POST['mode']) ? sanitize_text_field((string) $_POST['mode']) : null;
         if (!is_string($mode) || !in_array($mode, Service::MODES, true)) {
@@ -185,6 +204,8 @@ final class AdminSettings
         echo '<div class="wrap">';
         echo '<h1>' . esc_html__('WP Hero Color', 'wp-hero-color') . '</h1>';
 
+        self::render_requirements_section();
+
         if (is_array($summary) && isset($_GET['bulk_done'])) {
             printf(
                 '<div class="notice notice-success is-dismissible"><p>%s</p></div>',
@@ -204,6 +225,13 @@ final class AdminSettings
             printf(
                 '<div class="notice notice-error is-dismissible"><p>%s</p></div>',
                 esc_html__('Select at least one post type, or choose “All public post types”.', 'wp-hero-color')
+            );
+        }
+
+        if (isset($_GET['bulk_error']) && 'requirements' === (string) $_GET['bulk_error']) {
+            printf(
+                '<div class="notice notice-error is-dismissible"><p>%s</p></div>',
+                esc_html(Requirements::blocking_message_block())
             );
         }
 
@@ -334,6 +362,88 @@ final class AdminSettings
         echo '<p class="description">' . esc_html__('Replace user@host and /path/to/wordpress. Site:', 'wp-hero-color') . ' <code>' . esc_html($site) . '</code></p>';
 
         echo '</div>';
+    }
+
+    public static function render_plugin_row_requirements(string $plugin_file, array $plugin_data, string $status): void
+    {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
+        $blocking = Requirements::blocking_messages();
+        if ($blocking === []) {
+            return;
+        }
+
+        $wp_list_table = _get_list_table('WP_Plugins_List_Table');
+        $colspan = 4;
+        if ($wp_list_table instanceof \WP_Plugins_List_Table) {
+            $colspan = $wp_list_table->get_column_count();
+        }
+
+        echo '<tr class="plugin-update-tr active">';
+        echo '<td colspan="' . esc_attr((string) $colspan) . '" class="plugin-update colspanchange">';
+        echo '<div class="update-message notice inline notice-error notice-alt"><p>';
+        echo esc_html(
+            sprintf(
+                /* translators: %s: plugin name */
+                __('%s cannot compute colors until the following are resolved:', 'wp-hero-color'),
+                (string) ($plugin_data['Name'] ?? 'WP Hero Color')
+            )
+        );
+        echo '</p><ul style="margin-left:1.25em;list-style:disc;">';
+        foreach ($blocking as $line) {
+            echo '<li>' . esc_html($line) . '</li>';
+        }
+        echo '</ul><p>';
+        $settingsUrl = admin_url('options-general.php?page=wp-hero-color');
+        echo wp_kses(
+            sprintf(
+                /* translators: %s: URL to plugin settings */
+                __('Open <a href="%s">Hero Color settings</a> for the full environment report.', 'wp-hero-color'),
+                esc_url($settingsUrl)
+            ),
+            [
+                'a' => [
+                    'href' => [],
+                ],
+            ]
+        );
+        echo '</p></div></td></tr>';
+    }
+
+    private static function render_requirements_section(): void
+    {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
+        $blocking = Requirements::blocking_messages();
+        foreach ($blocking as $line) {
+            printf(
+                '<div class="notice notice-error"><p>%s</p></div>',
+                esc_html($line)
+            );
+        }
+
+        $warnings = Requirements::warning_messages();
+        foreach ($warnings as $line) {
+            printf(
+                '<div class="notice notice-warning"><p>%s</p></div>',
+                esc_html($line)
+            );
+        }
+
+        echo '<h2>' . esc_html__('Server environment (color extraction)', 'wp-hero-color') . '</h2>';
+        echo '<p class="description">' . esc_html__(
+            'Hero colors are computed with PHP only: image bytes are read from disk, decoded with GD, then pixels are sampled. No ImageMagick, Node.js, or external binaries are used.',
+            'wp-hero-color'
+        ) . '</p>';
+        echo '<table class="widefat striped" style="max-width:720px;"><tbody>';
+        foreach (Requirements::environment_facts() as $label => $value) {
+            echo '<tr><th scope="row" style="width:40%;">' . esc_html($label) . '</th><td>' . esc_html($value) . '</td></tr>';
+        }
+        echo '</tbody></table>';
     }
 
     /**

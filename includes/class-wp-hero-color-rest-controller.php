@@ -82,6 +82,14 @@ final class RestController
      */
     public function compute(WP_REST_Request $request)
     {
+        if (!Requirements::is_ready()) {
+            return new WP_Error(
+                'wp_hero_color_requirements',
+                wp_strip_all_tags(Requirements::blocking_message_block()),
+                ['status' => 503]
+            );
+        }
+
         $post_id = (int) $request->get_param('post_id');
         $attachment_id = (int) ($request->get_param('attachment_id') ?? 0);
         $mode = $request->get_param('mode');

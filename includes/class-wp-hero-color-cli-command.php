@@ -43,6 +43,8 @@ final class CliCommand
      */
     public function recompute(array $args, array $assoc_args): void
     {
+        $this->assert_requirements();
+
         $postId = isset($assoc_args['post_id']) ? (int) $assoc_args['post_id'] : 0;
         if ($postId < 1) {
             WP_CLI::error('Missing or invalid --post_id.');
@@ -100,6 +102,8 @@ final class CliCommand
      */
     public function recompute_all(array $args, array $assoc_args): void
     {
+        $this->assert_requirements();
+
         $mode = isset($assoc_args['mode']) ? (string) $assoc_args['mode'] : null;
         $dir = isset($assoc_args['linear_dir']) ? (string) $assoc_args['linear_dir'] : null;
         $postTypes = BulkRunner::resolvePostTypesFromCliArgs($assoc_args);
@@ -117,6 +121,15 @@ final class CliCommand
         if ($failed !== []) {
             WP_CLI::halt(1);
         }
+    }
+
+    private function assert_requirements(): void
+    {
+        if (Requirements::is_ready()) {
+            return;
+        }
+
+        WP_CLI::error(wp_strip_all_tags(Requirements::blocking_message_block()));
     }
 
     /**

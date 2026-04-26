@@ -76,6 +76,10 @@ final class Service
         ?string $mode = null,
         ?string $linear_dir = null
     ): ?array {
+        if (!Requirements::is_ready()) {
+            throw new RuntimeException(Requirements::blocking_message_block());
+        }
+
         if ($attachment_id === null || $attachment_id < 1) {
             $attachment_id = (int) get_post_thumbnail_id($post_id);
         }

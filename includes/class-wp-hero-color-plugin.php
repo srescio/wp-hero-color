@@ -10,6 +10,7 @@ final class Plugin
 
     public static function bootstrap(): void
     {
+        require_once WP_HERO_COLOR_DIR . 'includes/class-wp-hero-color-requirements.php';
         require_once WP_HERO_COLOR_DIR . 'includes/class-wp-hero-color-service.php';
         require_once WP_HERO_COLOR_DIR . 'includes/class-wp-hero-color-bulk-runner.php';
         require_once WP_HERO_COLOR_DIR . 'includes/class-wp-hero-color-rest-controller.php';
@@ -89,6 +90,17 @@ final class Plugin
             return;
         }
 
+        if (!Requirements::is_ready()) {
+            echo '<div class="notice notice-error inline"><p>';
+            echo esc_html(Requirements::blocking_message_block());
+            echo '</p><p class="description">';
+            echo esc_html__(
+                'Fix the server requirements listed on Settings → Hero Color, then use Recompute again.',
+                'wp-hero-color'
+            );
+            echo '</p></div>';
+        }
+
         wp_nonce_field('wp_hero_color_classic_box', 'wp_hero_color_classic_box_nonce');
 
         $payload = self::service()->get_payload((int) $post->ID);
@@ -126,7 +138,8 @@ final class Plugin
             );
         }
         echo '</select>';
-        echo '<button type="submit" class="button button-secondary" name="wp_hero_color_recompute" value="1">'
+        $recomputeAttrs = Requirements::is_ready() ? '' : ' disabled="disabled" aria-disabled="true"';
+        echo '<button type="submit" class="button button-secondary" name="wp_hero_color_recompute" value="1"' . $recomputeAttrs . '>'
             . esc_html__('Recompute', 'wp-hero-color') . '</button>';
         echo '<div style="width:100%;aspect-ratio:16/10;border:1px solid #dcdcde;border-radius:4px;background:' . esc_attr($previewBg) . ';"></div>';
         echo '<div style="display:flex;align-items:center;gap:8px;">';
@@ -170,7 +183,15 @@ final class Plugin
         $recompute = isset($_POST['wp_hero_color_recompute']) && '1' === (string) $_POST['wp_hero_color_recompute'];
 
         if ($recompute) {
-            self::service()->recompute_for_post($post_id, null, $mode, $dir);
+            if (!Requirements::is_ready()) {
+                return;
+            }
+            try {
+                self::service()->recompute_for_post($post_id, null, $mode, $dir);
+            } catch (\RuntimeException $e) {
+                return;
+            }
+
             return;
         }
 
@@ -237,7 +258,15 @@ final class Plugin
             return;
         }
 
-        self::service()->recompute_for_post($post_id, $thumbnail_id, null, null);
+        if (!Requirements::is_ready()) {
+            return;
+        }
+
+        try {
+            self::service()->recompute_for_post($post_id, $thumbnail_id, null, null);
+        } catch (\RuntimeException $e) {
+            return;
+        }
     }
 
     public static function register_cli(): void

@@ -2,7 +2,7 @@
 
 WordPress plugin to compute deterministic hero colors from featured images and apply them as solid or gradient backgrounds.
 
-<img src="./assets/banner-772x250.png" alt="WP Hero Color banner" width="772" />
+<img src="./assets/banner-772x250.png" alt="WP Hero Color banner" width="386" />
 
 ## Preview
 

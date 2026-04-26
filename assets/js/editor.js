@@ -11,6 +11,8 @@
   var Fragment = wp.element.Fragment;
   var useEffect = wp.element.useEffect;
   var useState = wp.element.useState;
+  var useRef = wp.element.useRef;
+  var useSelect = wp.data.useSelect;
   var registerPlugin = wp.plugins.registerPlugin;
   var PluginDocumentSettingPanel = wp.editPost.PluginDocumentSettingPanel;
   var Button = wp.components.Button;
@@ -31,7 +33,6 @@
   ];
 
   var pendingRequest = null;
-  var lastFeaturedMedia = null;
 
   function parsePayloadFromMeta() {
     var meta = wp.data.select("core/editor").getEditedPostAttribute("meta") || {};
@@ -102,6 +103,14 @@
   }
 
   function HeroColorPanel() {
+    var postId = useSelect(function (select) {
+      return select("core/editor").getCurrentPostId();
+    }, []);
+    var featuredMedia = useSelect(function (select) {
+      return select("core/editor").getEditedPostAttribute("featured_media");
+    }, []);
+    var lastMediaDigestRef = useRef("");
+
     var initialPayload = parsePayloadFromMeta();
     var initialMode = (initialPayload && initialPayload.mode) || "solid";
     var initialDir = (initialPayload && initialPayload.linear_dir) || "vertical";
@@ -126,15 +135,8 @@
       busy = _useState6[0],
       setBusy = _useState6[1];
 
-    function getPostIds() {
-      var postId = wp.data.select("core/editor").getCurrentPostId();
-      var featuredMedia = wp.data.select("core/editor").getEditedPostAttribute("featured_media");
-      return { postId: postId, featuredMedia: featuredMedia };
-    }
-
     function recompute(forceMode, forceDirection) {
-      var ids = getPostIds();
-      if (!ids.postId || !ids.featuredMedia) {
+      if (!postId || !featuredMedia) {
         return;
       }
       if (pendingRequest) {
@@ -144,8 +146,8 @@
       setBusy(true);
       setError("");
       postCompute({
-        post_id: ids.postId,
-        attachment_id: ids.featuredMedia,
+        post_id: postId,
+        attachment_id: featuredMedia,
         mode: forceMode || mode,
         linear_dir: forceDirection || direction
       })
@@ -173,23 +175,20 @@
     }
 
     useEffect(function () {
-      var unsubscribe = wp.data.subscribe(function () {
-        var ids = getPostIds();
-        if (!ids.featuredMedia || !ids.postId) {
-          return;
-        }
-        if (ids.featuredMedia === lastFeaturedMedia) {
-          return;
-        }
-        lastFeaturedMedia = ids.featuredMedia;
-        recompute(mode, direction);
-      });
-      return function () {
-        if (typeof unsubscribe === "function") {
-          unsubscribe();
-        }
-      };
-    }, [mode, direction]);
+      if (!postId) {
+        return;
+      }
+      if (!featuredMedia) {
+        lastMediaDigestRef.current = "";
+        return;
+      }
+      var digest = String(postId) + ":" + String(featuredMedia);
+      if (digest === lastMediaDigestRef.current) {
+        return;
+      }
+      lastMediaDigestRef.current = digest;
+      recompute(mode, direction);
+    }, [postId, featuredMedia]);
 
     return el(
       PluginDocumentSettingPanel,

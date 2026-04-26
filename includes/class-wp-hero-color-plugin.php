@@ -17,6 +17,7 @@ final class Plugin
         add_action('init', [self::class, 'register_meta']);
         add_action('rest_api_init', [self::class, 'register_rest_routes']);
         add_action('wp_enqueue_scripts', [self::class, 'enqueue_frontend_assets']);
+        add_action('enqueue_block_editor_assets', [self::class, 'enqueue_editor_assets']);
         add_action('set_post_thumbnail', [self::class, 'on_set_post_thumbnail'], 10, 3);
         add_filter('pll_copy_post_metas', [self::class, 'register_polylang_meta_copy'], 10, 5);
     }
@@ -57,6 +58,26 @@ final class Plugin
             WP_HERO_COLOR_URL . 'assets/css/sr-hero-color.css',
             [],
             WP_HERO_COLOR_VERSION
+        );
+    }
+
+    public static function enqueue_editor_assets(): void
+    {
+        wp_enqueue_script(
+            'wp-hero-color-editor',
+            WP_HERO_COLOR_URL . 'assets/js/editor.js',
+            ['wp-components', 'wp-data', 'wp-edit-post', 'wp-element', 'wp-plugins'],
+            WP_HERO_COLOR_VERSION,
+            true
+        );
+
+        wp_localize_script(
+            'wp-hero-color-editor',
+            'wpHeroColorConfig',
+            [
+                'restComputeUrl' => rest_url('sr-hero-color/v1/compute'),
+                'nonce' => wp_create_nonce('wp_rest'),
+            ]
         );
     }
 

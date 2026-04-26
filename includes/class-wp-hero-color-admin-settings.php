@@ -206,8 +206,9 @@ final class AdminSettings
         echo esc_html__('All public post types (same as WP-CLI --all-supported)', 'wp-hero-color') . '</label>';
         echo '</fieldset></td></tr>';
 
-        echo '<tr><th scope="row">' . esc_html__('Post types', 'wp-hero-color') . '</th><td>';
-        echo '<p class="description">' . esc_html__('Only types that support featured images are listed. Skips posts without a featured image.', 'wp-hero-color') . '</p>';
+        $postTypesRowStyle = 'all_public' === $savedScope ? ' style="display:none;"' : '';
+        echo '<tr id="wp-hero-color-post-types-row"' . $postTypesRowStyle . '><th scope="row">' . esc_html__('Post types', 'wp-hero-color') . '</th><td>';
+        echo '<p class="description">' . esc_html__('Only used when scope is "Selected post types (below)". Listed types support featured images. Skips posts without a featured image.', 'wp-hero-color') . '</p>';
         echo '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px;max-width:640px;">';
         foreach ($thumbTypes as $type) {
             $checked = in_array($type, $savedTypes, true) ? ' checked' : '';
@@ -286,6 +287,12 @@ final class AdminSettings
 
         submit_button(__('Run bulk recompute now', 'wp-hero-color'), 'primary', 'submit', false);
         echo '</form>';
+
+        echo '<script>';
+        echo '(function(){var r=document.getElementById("wp-hero-color-post-types-row");if(!r)return;';
+        echo 'function t(){var e=document.querySelector(\'input[name="scope"]:checked\');r.style.display=e&&e.value==="all_public"?"none":"";}';
+        echo 'document.querySelectorAll(\'input[name="scope"]\').forEach(function(n){n.addEventListener("change",t);});t();})();';
+        echo '</script>';
 
         echo '<h2>' . esc_html__('REST API (MCP-friendly)', 'wp-hero-color') . '</h2>';
         echo '<p>' . esc_html__('Use Application Passwords or cookie auth in tools that call WordPress REST. Meta key for stored payload:', 'wp-hero-color') . ' <code>' . esc_html(Service::META_KEY) . '</code></p>';

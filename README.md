@@ -24,9 +24,20 @@ This plugin is **not** on the WordPress.org directory. Install it in one of thes
 
 ### From a GitHub Release (recommended)
 
-When [GitHub Releases](https://github.com/srescio/wp-hero-color/releases) are published, a **Build release ZIP** workflow attaches a ready-to-upload archive named `wp-hero-color-<tag>.zip` with a stable top-level folder `wp-hero-color/`. Use **Plugins → Add New → Upload Plugin** in wp-admin, or unzip into `wp-content/plugins/`.
+GitHub uses **fixed URL shapes** for every repository (no permalink rot). For this repo (`srescio/wp-hero-color`):
 
-> **Note:** There may be no release assets yet; the automation lives in `.github/workflows/release-zip.yml`. Until the first release exists, use “from source” below or run the workflow manually (see below).
+| Link | Purpose |
+|------|---------|
+| [All releases](https://github.com/srescio/wp-hero-color/releases) | Index of published releases and assets. Works even when the list is empty. |
+| [Latest release](https://github.com/srescio/wp-hero-color/releases/latest) | Always resolves; shows the newest non-draft release once one exists (otherwise the same empty state as above). |
+
+**Direct ZIP URL** (after you publish a release for that tag):  
+`https://github.com/srescio/wp-hero-color/releases/download/<tag>/wp-hero-color-<tag>.zip`  
+Example for tag `v0.1.0`: `https://github.com/srescio/wp-hero-color/releases/download/v0.1.0/wp-hero-color-v0.1.0.zip` (returns 404 until that release exists).
+
+The **Build release ZIP** workflow (`.github/workflows/release-zip.yml`) attaches `wp-hero-color-<tag>.zip` with a stable top-level folder `wp-hero-color/`. Install via **Plugins → Add New → Upload Plugin**, or unzip into `wp-content/plugins/`.
+
+> **Note:** Until the first release is published, the releases page is empty and direct download URLs for a tag return **404**. Use **from source** below, or run the workflow manually (see below).
 
 ### From source
 

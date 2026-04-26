@@ -18,6 +18,29 @@ Editor panel preview samples:
 - `linear` (edge-averaged gradient with selectable direction)
 - `conic` (ambilight-style conic gradient using 8 edge colors)
 
+## How to install
+
+This plugin is **not** on the WordPress.org directory. Install it in one of these ways:
+
+### From a GitHub Release (recommended)
+
+When [GitHub Releases](https://github.com/srescio/wp-hero-color/releases) are published, a **Build release ZIP** workflow attaches a ready-to-upload archive named `wp-hero-color-<tag>.zip` with a stable top-level folder `wp-hero-color/`. Use **Plugins → Add New → Upload Plugin** in wp-admin, or unzip into `wp-content/plugins/`.
+
+> **Note:** There may be no release assets yet; the automation lives in `.github/workflows/release-zip.yml`. Until the first release exists, use “from source” below or run the workflow manually (see below).
+
+### From source
+
+Clone or download the repository and copy the project into `wp-content/plugins/wp-hero-color/` (the folder name must be `wp-hero-color` so WordPress loads `wp-hero-color.php`).
+
+### When the ZIP is built (not on PR merge)
+
+The ZIP workflow does **not** run automatically when a PR is merged. It runs only when:
+
+1. **Someone publishes a GitHub Release** — event `release: published`. The job checks out the **release tag** (not the default branch), builds the ZIP, and uploads it to that release as an asset.
+2. **Someone runs “Build release ZIP” manually** from the **Actions** tab (`workflow_dispatch`) — useful to verify packaging; the ZIP is stored as a **workflow artifact** (filename uses `dev-<short-sha>`), not attached to a release.
+
+Typical flow: merge to your mainline branch → create a **git tag** (for example `v0.1.0`) on the commit you want to ship → open **Releases → Draft a new release**, choose that tag, **Publish release** → download the attached ZIP.
+
 ## Data model
 
 The plugin stores one **JSON string** in post meta key `_sr_hero_bg` (registered for the REST API and Polylang meta copy). The document is normalized on save; unknown fields are dropped.

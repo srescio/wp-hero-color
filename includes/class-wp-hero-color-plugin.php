@@ -16,6 +16,7 @@ final class Plugin
         add_action('plugins_loaded', [self::class, 'load_textdomain']);
         add_action('init', [self::class, 'register_meta']);
         add_action('rest_api_init', [self::class, 'register_rest_routes']);
+        add_action('wp_enqueue_scripts', [self::class, 'enqueue_frontend_assets']);
         add_action('set_post_thumbnail', [self::class, 'on_set_post_thumbnail'], 10, 3);
         add_filter('pll_copy_post_metas', [self::class, 'register_polylang_meta_copy'], 10, 5);
     }
@@ -47,6 +48,16 @@ final class Plugin
     {
         $controller = new RestController(self::service());
         $controller->register_routes();
+    }
+
+    public static function enqueue_frontend_assets(): void
+    {
+        wp_enqueue_style(
+            'wp-hero-color',
+            WP_HERO_COLOR_URL . 'assets/css/sr-hero-color.css',
+            [],
+            WP_HERO_COLOR_VERSION
+        );
     }
 
     /**

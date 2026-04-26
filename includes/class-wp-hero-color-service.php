@@ -225,6 +225,79 @@ final class Service
     }
 
     /**
+     * @param array<string,mixed> $payload
+     */
+    public function build_background_css(array $payload): string
+    {
+        $payload = $this->sanitize_payload($payload);
+        $mode = (string) $payload['mode'];
+
+        if ($mode === 'conic') {
+            /** @var array<int,string> $edges */
+            $edges = $payload['edges'];
+            $stops = [];
+            foreach ($edges as $index => $edge) {
+                $stops[] = sprintf('%s %ddeg', $edge, $index * 45);
+            }
+            $stops[] = sprintf('%s 360deg', $edges[0]);
+
+            return sprintf('conic-gradient(from 0deg at 50%% 50%%, %s)', implode(', ', $stops));
+        }
+
+        if ($mode === 'linear') {
+            /** @var array<int,string> $edges */
+            $edges = $payload['edges'];
+            $direction = (string) $payload['linear_dir'];
+
+            [$start, $end, $cssDirection] = $this->linear_gradient_stops_from_edges($edges, $direction);
+
+            return sprintf('linear-gradient(%s, %s, %s)', $cssDirection, $start, $end);
+        }
+
+        return (string) $payload['main'];
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     */
+    public function build_inline_style(array $payload): string
+    {
+        $payload = $this->sanitize_payload($payload);
+        $background = $this->build_background_css($payload);
+
+        $vars = [
+            '--sr-hero-main:' . $payload['main'],
+            '--sr-hero-bg:' . $payload['main'],
+            '--sr-hero-bg-image:' . $background,
+        ];
+
+        if ((string) $payload['mode'] === 'solid') {
+            $vars[] = 'background-color:' . $payload['main'];
+        } else {
+            $vars[] = 'background-image:' . $background;
+            $vars[] = 'background-color:' . $payload['main'];
+        }
+
+        return implode(';', $vars) . ';';
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     * @return array<string,string>
+     */
+    public function build_attributes(array $payload): array
+    {
+        $payload = $this->sanitize_payload($payload);
+
+        return [
+            'data-sr-hero-computed' => '1',
+            'data-sr-hero-mode' => (string) $payload['mode'],
+            'data-sr-hero-dir' => (string) $payload['linear_dir'],
+            'style' => $this->build_inline_style($payload),
+        ];
+    }
+
+    /**
      * @return array{0:int,1:int,2:int}
      */
     private function sample_region($img, int $x1, int $x2, int $y1, int $y2): array
@@ -286,5 +359,66 @@ final class Service
             max(0, min(255, $rgb[1])),
             max(0, min(255, $rgb[2]))
         );
+    }
+
+    /**
+     * @param array<int,string> $edges
+     * @return array{0:string,1:string,2:string}
+     */
+    private function linear_gradient_stops_from_edges(array $edges, string $direction): array
+    {
+        $cssDirection = 'to bottom';
+        $startIndices = [0, 1, 2];
+        $endIndices = [6, 5, 4];
+
+        if ($direction === 'horizontal') {
+            $cssDirection = 'to right';
+            $startIndices = [7, 0, 6];
+            $endIndices = [3, 2, 4];
+        } elseif ($direction === 'diag_tl_br') {
+            $cssDirection = 'to bottom right';
+            $startIndices = [0, 1, 7];
+            $endIndices = [4, 3, 5];
+        } elseif ($direction === 'diag_tr_bl') {
+            $cssDirection = 'to bottom left';
+            $startIndices = [2, 1, 3];
+            $endIndices = [6, 5, 7];
+        }
+
+        $start = $this->average_colors([$edges[$startIndices[0]], $edges[$startIndices[1]], $edges[$startIndices[2]]]);
+        $end = $this->average_colors([$edges[$endIndices[0]], $edges[$endIndices[1]], $edges[$endIndices[2]]]);
+
+        return [$start, $end, $cssDirection];
+    }
+
+    /**
+     * @param array<int,string> $colors
+     */
+    private function average_colors(array $colors): string
+    {
+        $sumR = 0;
+        $sumG = 0;
+        $sumB = 0;
+        $count = 0;
+
+        foreach ($colors as $color) {
+            if (!$this->is_valid_rgb_css($color)) {
+                continue;
+            }
+            preg_match_all('/\\d+/', $color, $matches);
+            if (!isset($matches[0]) || count($matches[0]) < 3) {
+                continue;
+            }
+            $sumR += (int) $matches[0][0];
+            $sumG += (int) $matches[0][1];
+            $sumB += (int) $matches[0][2];
+            $count++;
+        }
+
+        if ($count < 1) {
+            return 'rgb(34,34,34)';
+        }
+
+        return sprintf('rgb(%d,%d,%d)', (int) round($sumR / $count), (int) round($sumG / $count), (int) round($sumB / $count));
     }
 }

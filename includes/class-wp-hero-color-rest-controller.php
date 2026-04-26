@@ -106,7 +106,14 @@ final class RestController
             );
         }
 
-        return new WP_REST_Response(['payload' => $payload], 200);
+        return new WP_REST_Response(
+            [
+                'payload' => $payload,
+                'inline_style' => $this->service->build_inline_style($payload),
+                'attributes' => $this->service->build_attributes($payload),
+            ],
+            200
+        );
     }
 
     /**
@@ -124,6 +131,8 @@ final class RestController
             [
                 'post_id' => $post_id,
                 'payload' => $payload,
+                'inline_style' => $this->service->build_inline_style($payload),
+                'attributes' => $this->service->build_attributes($payload),
             ],
             200
         );

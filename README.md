@@ -32,7 +32,7 @@ The plugin stores the computed payload in post meta key `_sr_hero_bg`:
 In **wp-admin**, open **Settings → Hero Color** (capability: `manage_options`). From there you can:
 
 - Run **bulk recompute** on the server (same logic as `wp hero-color recompute_all`), with scope and optional mode overrides.
-- Optionally restrict bulk runs by **category** and/or **tag** (term IDs). Run once per combination with a different mode override to style different groups differently.
+- Optionally restrict bulk runs by **category** and/or **tag** (term IDs) when scope is **Selected post types** (taxonomy filters are ignored for the all-public scope so the UI matches behavior). Run once per combination with a different mode override to style different groups differently.
 - Copy **REST** and **WP-CLI over SSH** examples for automation (MCP and remote hosts use these; the browser cannot open SSH itself).
 
 ## Host Theme Integration Contract

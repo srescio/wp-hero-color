@@ -56,15 +56,29 @@ final class AdminSettings
             $linearDir = null;
         }
 
-        $scope = isset($_POST['scope']) ? sanitize_text_field((string) $_POST['scope']) : 'selected';
-        if ('all_public' === $scope) {
-            $postTypes = BulkRunner::publicPostTypeNames();
-        } else {
-            $raw = isset($_POST['post_types']) && is_array($_POST['post_types']) ? $_POST['post_types'] : [];
-            $postTypes = array_values(array_filter(array_map('sanitize_key', $raw)));
+        if (!in_array($mode, ['linear', 'conic'], true)) {
+            $linearDir = null;
         }
 
-        if ('all_public' !== $scope && $postTypes === []) {
+        $prefsBefore = get_option(self::OPTION_KEY, []);
+        if (!is_array($prefsBefore)) {
+            $prefsBefore = [];
+        }
+        $prevTypes = isset($prefsBefore['post_types']) && is_array($prefsBefore['post_types']) && $prefsBefore['post_types'] !== []
+            ? $prefsBefore['post_types']
+            : ['post', 'page'];
+
+        $scope = isset($_POST['scope']) ? sanitize_text_field((string) $_POST['scope']) : 'selected';
+        if ('all_public' === $scope) {
+            $postTypesRun = BulkRunner::publicPostTypeNames();
+            $postTypesPrefs = $prevTypes;
+        } else {
+            $raw = isset($_POST['post_types']) && is_array($_POST['post_types']) ? $_POST['post_types'] : [];
+            $postTypesRun = array_values(array_filter(array_map('sanitize_key', $raw)));
+            $postTypesPrefs = $postTypesRun;
+        }
+
+        if ('all_public' !== $scope && $postTypesRun === []) {
             wp_safe_redirect(
                 add_query_arg(
                     [
@@ -82,18 +96,20 @@ final class AdminSettings
         $categoryIn = self::sanitize_term_ids($catRaw, 'category');
         $tagIn = self::sanitize_term_ids($tagRaw, 'post_tag');
         $taxFilters = [];
-        if ($categoryIn !== []) {
-            $taxFilters['category_in'] = $categoryIn;
-        }
-        if ($tagIn !== []) {
-            $taxFilters['tag_in'] = $tagIn;
+        if ('all_public' !== $scope) {
+            if ($categoryIn !== []) {
+                $taxFilters['category_in'] = $categoryIn;
+            }
+            if ($tagIn !== []) {
+                $taxFilters['tag_in'] = $tagIn;
+            }
         }
 
         update_option(
             self::OPTION_KEY,
             [
                 'scope' => $scope,
-                'post_types' => $postTypes,
+                'post_types' => $postTypesPrefs,
                 'mode' => $mode,
                 'linear_dir' => $linearDir,
                 'categories' => $categoryIn,
@@ -105,7 +121,7 @@ final class AdminSettings
         @set_time_limit(0);
 
         $runner = new BulkRunner(Plugin::service());
-        $results = $runner->run($postTypes, $mode, $linearDir, $taxFilters);
+        $results = $runner->run($postTypesRun, $mode, $linearDir, $taxFilters);
 
         $counts = ['processed' => 0, 'skipped' => 0, 'failed' => 0];
         foreach ($results as $row) {
@@ -163,6 +179,8 @@ final class AdminSettings
         $savedDir = isset($prefs['linear_dir']) && is_string($prefs['linear_dir']) ? $prefs['linear_dir'] : '';
         $savedCats = isset($prefs['categories']) && is_array($prefs['categories']) ? array_map('intval', $prefs['categories']) : [];
         $savedTags = isset($prefs['tags']) && is_array($prefs['tags']) ? array_map('intval', $prefs['tags']) : [];
+        $taxRowsHidden = 'all_public' === $savedScope ? ' style="display:none;"' : '';
+        $linearDirRowHidden = in_array($savedMode, ['linear', 'conic'], true) ? '' : ' style="display:none;"';
 
         echo '<div class="wrap">';
         echo '<h1>' . esc_html__('WP Hero Color', 'wp-hero-color') . '</h1>';
@@ -216,8 +234,8 @@ final class AdminSettings
         }
         echo '</div></td></tr>';
 
-        echo '<tr><th scope="row">' . esc_html__('Categories', 'wp-hero-color') . '</th><td>';
-        echo '<p class="description">' . esc_html__('Optional. Posts must be in at least one selected category. Combined with tags using AND. Applies via tax_query (mainly affects built-in post type “post”).', 'wp-hero-color') . '</p>';
+        echo '<tr id="wp-hero-color-categories-row"' . $taxRowsHidden . '><th scope="row">' . esc_html__('Categories', 'wp-hero-color') . '</th><td>';
+        echo '<p class="description">' . esc_html__('Optional when scope is "Selected post types". Posts must be in at least one selected category. Combined with tags using AND. Applies via tax_query (mainly affects the built-in "post" type).', 'wp-hero-color') . '</p>';
         echo '<div style="max-height:220px;overflow:auto;border:1px solid #c3c4c7;padding:8px;border-radius:4px;max-width:640px;">';
         $cats = get_terms([
             'taxonomy' => 'category',
@@ -240,8 +258,8 @@ final class AdminSettings
         }
         echo '</div></td></tr>';
 
-        echo '<tr><th scope="row">' . esc_html__('Tags', 'wp-hero-color') . '</th><td>';
-        echo '<p class="description">' . esc_html__('Optional. Posts must have at least one selected tag. When both categories and tags are set, posts must match both.', 'wp-hero-color') . '</p>';
+        echo '<tr id="wp-hero-color-tags-row"' . $taxRowsHidden . '><th scope="row">' . esc_html__('Tags', 'wp-hero-color') . '</th><td>';
+        echo '<p class="description">' . esc_html__('Optional when scope is "Selected post types". Posts must have at least one selected tag. When both categories and tags are set, posts must match both.', 'wp-hero-color') . '</p>';
         echo '<div style="max-height:220px;overflow:auto;border:1px solid #c3c4c7;padding:8px;border-radius:4px;max-width:640px;">';
         $tags = get_terms([
             'taxonomy' => 'post_tag',
@@ -273,14 +291,14 @@ final class AdminSettings
         }
         echo '</select></td></tr>';
 
-        echo '<tr><th scope="row"><label for="wp-hero-color-dir">' . esc_html__('Linear direction override', 'wp-hero-color') . '</label></th><td>';
+        echo '<tr id="wp-hero-color-linear-dir-row"' . $linearDirRowHidden . '><th scope="row"><label for="wp-hero-color-dir">' . esc_html__('Linear direction override', 'wp-hero-color') . '</label></th><td>';
         echo '<select name="linear_dir" id="wp-hero-color-dir">';
         echo '<option value="">' . esc_html__('(keep each post as saved)', 'wp-hero-color') . '</option>';
         foreach (Service::LINEAR_DIRECTIONS as $d) {
             echo '<option value="' . esc_attr($d) . '"' . selected($savedDir, $d, false) . '>' . esc_html($d) . '</option>';
         }
         echo '</select>';
-        echo '<p class="description">' . esc_html__('Used when mode is linear or when forcing linear_dir with other modes.', 'wp-hero-color') . '</p>';
+        echo '<p class="description">' . esc_html__('Shown only when mode override is linear (gradient) or conic (ambilight). Ignored for solid.', 'wp-hero-color') . '</p>';
         echo '</td></tr>';
 
         echo '</tbody></table>';
@@ -289,9 +307,17 @@ final class AdminSettings
         echo '</form>';
 
         echo '<script>';
-        echo '(function(){var r=document.getElementById("wp-hero-color-post-types-row");if(!r)return;';
-        echo 'function t(){var e=document.querySelector(\'input[name="scope"]:checked\');r.style.display=e&&e.value==="all_public"?"none":"";}';
-        echo 'document.querySelectorAll(\'input[name="scope"]\').forEach(function(n){n.addEventListener("change",t);});t();})();';
+        echo '(function(){';
+        echo 'var pt=document.getElementById("wp-hero-color-post-types-row");';
+        echo 'var cr=document.getElementById("wp-hero-color-categories-row");';
+        echo 'var tr=document.getElementById("wp-hero-color-tags-row");';
+        echo 'var dr=document.getElementById("wp-hero-color-linear-dir-row");';
+        echo 'var mode=document.getElementById("wp-hero-color-mode");';
+        echo 'function scope(){var e=document.querySelector(\'input[name="scope"]:checked\');var hide=e&&e.value==="all_public";';
+        echo 'var d=hide?"none":"";if(pt)pt.style.display=d;if(cr)cr.style.display=d;if(tr)tr.style.display=d;}';
+        echo 'function modeRow(){if(!dr||!mode)return;var v=mode.value;var show=v==="linear"||v==="conic";dr.style.display=show?"":"none";}';
+        echo 'document.querySelectorAll(\'input[name="scope"]\').forEach(function(n){n.addEventListener("change",scope);});';
+        echo 'if(mode)mode.addEventListener("change",modeRow);scope();modeRow();})();';
         echo '</script>';
 
         echo '<h2>' . esc_html__('REST API (MCP-friendly)', 'wp-hero-color') . '</h2>';
